@@ -24,7 +24,9 @@ class FinderConfig(BaseModel):
     # Directories to ignore
     ignored_directories: Set[str] = {
         ".git", ".svn", ".hg", "__pycache__", ".pytest_cache",
-        "node_modules", ".venv", "venv", ".env",
+        "node_modules", ".venv", "venv", ".env", ".nox",
+        ".tox", ".mypy_cache", ".coverage", "dist", "build",
+        ".eggs", "*.egg-info", ".idea", ".vscode",
         "Library/Caches", "Library/Logs", ".Trash",
         "System", "Applications", ".DS_Store"
     }

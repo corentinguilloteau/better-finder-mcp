@@ -53,6 +53,14 @@ class SimpleSearchAgent:
         matches = len(query_words.intersection(content_words))
         return matches / len(query_words)
     
+    def _should_ignore_path(self, file_path: Path) -> bool:
+        """Check if a path should be ignored based on ignored directories."""
+        path_parts = file_path.parts
+        for part in path_parts:
+            if part in self.config.ignored_directories:
+                return True
+        return False
+    
     def _filename_search(self, pattern: str, max_results: int = 20) -> List[Dict[str, Any]]:
         """Search files by filename pattern with fuzzy matching."""
         results = []
@@ -64,6 +72,10 @@ class SimpleSearchAgent:
                 
             for file_path in scan_path.rglob("*"):
                 if not file_path.is_file():
+                    continue
+                
+                # Skip files in ignored directories
+                if self._should_ignore_path(file_path):
                     continue
                 
                 filename_lower = file_path.name.lower()
