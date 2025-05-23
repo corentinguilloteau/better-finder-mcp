@@ -1,0 +1,43 @@
+# Better Finder Ignore File
+# Similar to .gitignore, this file specifies patterns for files and directories to ignore during staging
+
+# Development directories
+.nox/
+.tox/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Virtual environments
+.venv/
+venv/
+.env
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# Specific files to ignore
+secrets.txt
+*.key
+*.pem
+
+.py 

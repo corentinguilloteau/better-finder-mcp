@@ -2,7 +2,7 @@
 
 import asyncio
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import typer
 from rich.console import Console
@@ -14,9 +14,127 @@ from rich.prompt import Prompt, Confirm
 from .config import FinderConfig
 from .indexer import DocumentIndexer
 from .simple_agents import SimpleSearchAgent, SimpleIndexingAgent
+from .staging import StagingManager
 
 app = typer.Typer(help="Enhanced Finder - Intelligent file search for macOS")
 console = Console()
+
+
+@app.command()
+def add(
+    paths: List[str] = typer.Argument(..., help="Files or directories to stage for indexing")
+):
+    """Stage files or directories for indexing (like git add)."""
+    config = FinderConfig()
+    staging = StagingManager(config)
+    
+    total_added = 0
+    total_ignored = 0
+    total_unsupported = 0
+    
+    for path in paths:
+        result = staging.add_path(path)
+        
+        if "error" in result:
+            console.print(f"[red]Error: {result['error']}[/red]")
+            continue
+        
+        total_added += result["total_added"]
+        total_ignored += result["total_ignored"]
+        total_unsupported += result["total_unsupported"]
+        
+        if result["total_added"] > 0:
+            console.print(f"[green]Added {result['total_added']} files from '{path}'[/green]")
+        
+        if result["total_ignored"] > 0:
+            console.print(f"[yellow]Ignored {result['total_ignored']} files from '{path}' (matched .betterfinderignore)[/yellow]")
+        
+        if result["total_unsupported"] > 0:
+            console.print(f"[dim]Skipped {result['total_unsupported']} files from '{path}' (unsupported extensions)[/dim]")
+    
+    # Summary
+    if total_added > 0:
+        console.print(f"\n[green]✓ {total_added} files staged for indexing[/green]")
+        console.print("[blue]Run 'better-finder status' to see staged files[/blue]")
+        console.print("[blue]Run 'better-finder index' to index staged files[/blue]")
+    else:
+        console.print("[yellow]No files were staged for indexing[/yellow]")
+        if total_unsupported > 0:
+            supported_exts = ", ".join(sorted(config.supported_extensions))
+            console.print(f"[dim]Supported extensions: {supported_exts}[/dim]")
+        if total_ignored > 0:
+            console.print("[dim]Check .betterfinderignore file for ignore patterns[/dim]")
+
+
+@app.command()
+def rm(
+    paths: List[str] = typer.Argument(..., help="Files or directories to unstage")
+):
+    """Remove files or directories from staging (like git rm --cached)."""
+    config = FinderConfig()
+    staging = StagingManager(config)
+    
+    total_removed = 0
+    
+    for path in paths:
+        result = staging.remove_path(path)
+        total_removed += result["total_removed"]
+        
+        if result["total_removed"] > 0:
+            console.print(f"[green]Removed {result['total_removed']} files from staging for '{path}'[/green]")
+        else:
+            console.print(f"[yellow]No staged files found for '{path}'[/yellow]")
+    
+    if total_removed > 0:
+        console.print(f"\n[green]✓ Total files unstaged: {total_removed}[/green]")
+    else:
+        console.print("[yellow]No files were unstaged[/yellow]")
+
+
+@app.command()
+def status():
+    """Show staging status (like git status)."""
+    config = FinderConfig()
+    staging = StagingManager(config)
+    
+    status_info = staging.get_status()
+    
+    if status_info["total_staged"] == 0:
+        console.print("On branch main")
+        console.print("No files staged for indexing")
+        console.print("")
+        console.print("Use 'better-finder add <path>' to stage files for indexing")
+        return
+    
+    # Git-style output
+    console.print("On branch main")
+    console.print("Changes to be indexed:")
+    console.print("")
+    
+    # Show staged files in git-style format
+    for file_path in sorted(status_info["staged_files"]):
+        try:
+            # Try to make path relative to current working directory for cleaner display
+            relative_path = Path(file_path).relative_to(Path.cwd())
+            display_path = str(relative_path)
+        except ValueError:
+            # If not relative to cwd, show absolute path
+            display_path = file_path
+        
+        console.print(f"        [green]new:[/green]   {display_path}")
+    
+    console.print("")
+    
+    # Show summary and commands
+    console.print(f"[blue]{status_info['total_staged']} files staged for indexing[/blue]")
+    console.print("")
+    console.print("Commands:")
+    console.print("  better-finder index        - Index all staged files")
+    console.print("  better-finder rm <path>    - Unstage files/directories") 
+    console.print("  better-finder add <path>   - Stage more files/directories")
+    
+    if status_info["missing_files"]:
+        console.print(f"\n[yellow]Warning: {len(status_info['missing_files'])} staged files no longer exist and were removed from staging[/yellow]")
 
 
 @app.command()
@@ -99,15 +217,16 @@ def _display_search_table(results, query):
 
 @app.command()
 def index(
-    path: Optional[str] = typer.Argument(None, help="Directory to index (optional for full reindex)"),
+    path: Optional[str] = typer.Argument(None, help="Directory to index (optional for staging/full reindex)"),
     full: bool = typer.Option(False, "--full", "-f", help="Perform full reindex"),
-    incremental: bool = typer.Option(False, "--incremental", "-i", help="Perform incremental index")
+    incremental: bool = typer.Option(False, "--incremental", "-i", help="Perform incremental index"),
+    staged: bool = typer.Option(True, "--staged/--no-staged", help="Use staged files (default: True)")
 ):
-    """Index files for searching."""
-    asyncio.run(_index_async(path, full, incremental))
+    """Index files for searching. By default, indexes staged files."""
+    asyncio.run(_index_async(path, full, incremental, staged))
 
 
-async def _index_async(path: Optional[str], full: bool, incremental: bool):
+async def _index_async(path: Optional[str], full: bool, incremental: bool, staged: bool = True):
     """Async indexing implementation."""
     config = FinderConfig()
     config.ensure_directories()
@@ -116,6 +235,7 @@ async def _index_async(path: Optional[str], full: bool, incremental: bool):
     indexer.load_or_create_index()
     
     indexing_agent = SimpleIndexingAgent(config, indexer)
+    staging = StagingManager(config)
     
     with Progress(
         SpinnerColumn(),
@@ -137,8 +257,39 @@ async def _index_async(path: Optional[str], full: bool, incremental: bool):
             
             task = progress.add_task(f"Indexing {path}...", total=None)
             stats = await indexer.index_directory(path_obj)
+        elif staged:
+            # Index staged files
+            staged_files = staging.get_staged_files()
+            if not staged_files:
+                console.print("[yellow]No files staged for indexing.[/yellow]")
+                console.print("[blue]Use 'better-finder add <path>' to stage files first.[/blue]")
+                return
+            
+            task = progress.add_task(f"Indexing {len(staged_files)} staged files...", total=None)
+            stats = {"processed": 0, "indexed": 0, "errors": 0}
+            
+            for file_path in staged_files:
+                stats["processed"] += 1
+                try:
+                    if await indexer.index_file(file_path):
+                        stats["indexed"] += 1
+                except Exception as e:
+                    stats["errors"] += 1
+                    console.print(f"[red]Error indexing {file_path}: {e}[/red]")
+                
+                # Save periodically
+                if stats["indexed"] % 50 == 0:
+                    indexer.save_index()
+            
+            indexer.save_index()
+            
+            # Clear staging after successful indexing
+            if stats["errors"] == 0:
+                staging.clear_staging()
+                console.print("[green]✓ Staging cleared after successful indexing[/green]")
         else:
-            console.print("[yellow]Please specify --full, --incremental, or provide a path to index.[/yellow]")
+            console.print("[yellow]Please specify --full, --incremental, provide a path, or use staged files (default).[/yellow]")
+            console.print("[blue]Use 'better-finder add <path>' to stage files for indexing.[/blue]")
             return
     
     # Display results
