@@ -16,15 +16,35 @@ from .indexer import DocumentIndexer
 from .simple_agents import SimpleSearchAgent, SimpleIndexingAgent
 from .staging import StagingManager
 
-app = typer.Typer(help="Enhanced Finder - Intelligent file search for macOS")
+app = typer.Typer(
+    help="Better Finder - Intelligent file search with MCP support",
+    no_args_is_help=True,
+    add_completion=False
+)
 console = Console()
+
+def show_logo():
+    """Display the Better Finder logo."""
+    logo = """
+[bold blue]╔══════════════════════════════════════╗[/bold blue]
+[bold blue]║[/bold blue]  [bold cyan]🔍 Better Finder MCP[/bold cyan]             [bold blue]║[/bold blue]
+[bold blue]║[/bold blue]  [dim]Intelligent file search & indexing[/dim]  [bold blue]║[/bold blue]
+[bold blue]╚══════════════════════════════════════╝[/bold blue]
+"""
+    console.print(logo)
+    console.print("")
+
+@app.callback()
+def main():
+    """Better Finder - Git-like workflow for intelligent file search and MCP integration."""
+    show_logo()
 
 
 @app.command()
 def add(
-    paths: List[str] = typer.Argument(..., help="Files or directories to stage for indexing")
+    paths: List[str] = typer.Argument(..., help="Files or directories to stage")
 ):
-    """Stage files or directories for indexing (like git add)."""
+    """Stage files for indexing (like git add)."""
     config = FinderConfig()
     staging = StagingManager(config)
     
@@ -70,7 +90,7 @@ def add(
 def rm(
     paths: List[str] = typer.Argument(..., help="Files or directories to unstage")
 ):
-    """Remove files or directories from staging (like git rm --cached)."""
+    """Remove files from staging."""
     config = FinderConfig()
     staging = StagingManager(config)
     
@@ -93,7 +113,7 @@ def rm(
 
 @app.command()
 def status():
-    """Show staging status (like git status)."""
+    """Show staged files."""
     config = FinderConfig()
     staging = StagingManager(config)
     
@@ -139,12 +159,12 @@ def status():
 
 @app.command()
 def search(
-    query: str = typer.Argument(..., help="Search query"),
-    max_results: int = typer.Option(10, "--max", "-m", help="Maximum number of results"),
-    file_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by file type"),
-    output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, simple")
+    query: str = typer.Argument(..., help="What to search for"),
+    max_results: int = typer.Option(10, "--max", "-m", help="Maximum results"),
+    file_type: Optional[str] = typer.Option(None, "--type", "-t", help="File type filter"),
+    output_format: str = typer.Option("table", "--format", "-f", help="Output format")
 ):
-    """Search for files using intelligent semantic and filename matching."""
+    """Search indexed files."""
     asyncio.run(_search_async(query, max_results, file_type, output_format))
 
 
@@ -217,12 +237,12 @@ def _display_search_table(results, query):
 
 @app.command()
 def index(
-    path: Optional[str] = typer.Argument(None, help="Directory to index (optional for staging/full reindex)"),
-    full: bool = typer.Option(False, "--full", "-f", help="Perform full reindex"),
-    incremental: bool = typer.Option(False, "--incremental", "-i", help="Perform incremental index"),
-    staged: bool = typer.Option(True, "--staged/--no-staged", help="Use staged files (default: True)")
+    path: Optional[str] = typer.Argument(None, help="Specific directory to index"),
+    full: bool = typer.Option(False, "--full", "-f", help="Index all configured paths"),
+    incremental: bool = typer.Option(False, "--incremental", "-i", help="Index only new files"),
+    staged: bool = typer.Option(True, "--staged/--no-staged", help="Use staged files")
 ):
-    """Index files for searching. By default, indexes staged files."""
+    """Index files for searching (uses staged files by default)."""
     asyncio.run(_index_async(path, full, incremental, staged))
 
 
@@ -304,7 +324,7 @@ async def _index_async(path: Optional[str], full: bool, incremental: bool, stage
 
 @app.command()
 def stats():
-    """Show indexing statistics."""
+    """Show index statistics."""
     config = FinderConfig()
     
     try:
@@ -351,64 +371,10 @@ def stats():
         console.print(f"[red]Error getting statistics: {e}[/red]")
 
 
-@app.command()
-def config_cmd(
-    action: str = typer.Argument(..., help="Action: add, remove, list"),
-    path: Optional[str] = typer.Argument(None, help="Path to add or remove")
-):
-    """Configure scan paths."""
-    config = FinderConfig()
-    
-    if action == "list":
-        table = Table(title="Configured Scan Paths")
-        table.add_column("#", style="cyan")
-        table.add_column("Path", style="blue")
-        table.add_column("Status", style="green")
-        
-        for i, scan_path in enumerate(config.scan_paths, 1):
-            status = "✓ Exists" if scan_path.exists() else "✗ Missing"
-            table.add_row(str(i), str(scan_path), status)
-        
-        console.print(table)
-    
-    elif action == "add":
-        if not path:
-            console.print("[red]Path is required for add action[/red]")
-            return
-        
-        path_obj = Path(path).expanduser().resolve()
-        if not path_obj.exists():
-            console.print(f"[red]Path does not exist: {path}[/red]")
-            return
-        
-        if path_obj not in config.scan_paths:
-            config.scan_paths.append(path_obj)
-            console.print(f"[green]Added path: {path_obj}[/green]")
-            
-            if Confirm.ask("Index this path now?"):
-                asyncio.run(_index_async(str(path_obj), False, False))
-        else:
-            console.print(f"[yellow]Path already configured: {path_obj}[/yellow]")
-    
-    elif action == "remove":
-        if not path:
-            console.print("[red]Path is required for remove action[/red]")
-            return
-        
-        path_obj = Path(path).expanduser().resolve()
-        if path_obj in config.scan_paths:
-            config.scan_paths.remove(path_obj)
-            console.print(f"[green]Removed path: {path_obj}[/green]")
-        else:
-            console.print(f"[yellow]Path not found in configuration: {path_obj}[/yellow]")
-    
-    else:
-        console.print("[red]Invalid action. Use 'add', 'remove', or 'list'[/red]")
-
 
 @app.command()
-def show(file_path: str = typer.Argument(..., help="Path to file to display")):
-    """Show content of a specific file."""
+def show(file_path: str = typer.Argument(..., help="File path")):
+    """Display file content."""
     config = FinderConfig()
     indexer = DocumentIndexer(config)
     
@@ -448,9 +414,9 @@ def show(file_path: str = typer.Argument(..., help="Path to file to display")):
 
 @app.command()
 def clear_index(
-    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt")
+    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation")
 ):
-    """Clear the entire index and metadata database."""
+    """Clear all indexed data."""
     config = FinderConfig()
     
     if not confirm:
@@ -488,10 +454,10 @@ def clear_index(
 
 @app.command()
 def remove_file(
-    file_path: str = typer.Argument(..., help="Path to file to remove from index"),
-    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt")
+    file_path: str = typer.Argument(..., help="File to remove from index"),
+    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation")
 ):
-    """Remove a specific file from the index."""
+    """Remove file from index."""
     config = FinderConfig()
     path_obj = Path(file_path).resolve()
     
@@ -523,7 +489,7 @@ def remove_file(
 
 @app.command()
 def server():
-    """Start the MCP server."""
+    """Start MCP server for Claude integration."""
     from .mcp_server import EnhancedFinderMCPServer
     
     console.print("[green]Starting Enhanced Finder MCP Server...[/green]")
@@ -533,10 +499,10 @@ def server():
     asyncio.run(server.run())
 
 
-def main():
-    """Main entry point."""
+def cli_main():
+    """CLI entry point."""
     app()
 
 
 if __name__ == "__main__":
-    main()
+    cli_main()

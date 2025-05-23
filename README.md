@@ -1,261 +1,167 @@
-# Enhanced Finder MCP
+# 🔍 Better Finder MCP
 
-A better version of macOS Finder that provides intelligent file search and indexing capabilities through the Model Context Protocol (MCP).
+**Git-like workflow for intelligent file search and Claude MCP integration**
 
-## Features
+Better Finder transforms file discovery with semantic search, hybrid matching, and a familiar Git-style workflow. Index your documents, search with natural language, and integrate seamlessly with Claude Desktop.
 
-- **Git-like Staging Workflow**: Stage files with `add`, check status, remove from staging with `rm`, and index only what you want
-- **.betterfinderignore Support**: Use ignore patterns similar to .gitignore to exclude files and directories
-- **Hybrid Search**: Combines semantic search, keyword matching, and fuzzy filename search for comprehensive results
-- **Multiple File Types**: Support for PDF, Excel, Word, PowerPoint, CSV, text files, and more
-- **MCP Server**: Full Model Context Protocol server implementation  
-- **Rich CLI**: Beautiful command-line interface using Rich library
-- **Speed Optimized**: Larger chunk sizes and lower similarity thresholds for faster, more comprehensive search
-- **Index Management**: Clear indexes and remove specific files as needed
-- **Fast Retrieval**: Vector-based similarity search with FAISS for quick file discovery
+## 🚀 Quick Start
 
-## Installation
+### Installation
 
-1. Clone the repository:
 ```bash
-git clone <repository-url>
+# Clone and install
+git clone https://github.com/GitHamza0206/better-finder-mcp.git
 cd better-finder-mcp
-```
-
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-3. Install the package:
-```bash
+uv venv
+source .venv/bin/activate
 pip install -e .
+
+# Install it globally with uv
+uv tool install -e .
 ```
 
-## Usage
-
-### Command Line Interface
-
-#### Git-like Staging Workflow
-
-Better Finder now supports a Git-like staging workflow for precise control over which files get indexed:
+### Basic Workflow
 
 ```bash
-# Stage files for indexing (like git add)
-better-finder add .                    # Stage all files in current directory
-better-finder add ~/Documents/Reports  # Stage specific directory
-better-finder add file1.pdf file2.docx # Stage specific files
+# 1. Stage files for indexing (like git add)
+better-finder add ~/Documents
 
-# Check what's staged for indexing (like git status)
+# 2. Check what's staged
 better-finder status
 
-# Remove files from staging (like git rm --cached)
-better-finder rm ~/Documents/Reports/old-file.pdf
-better-finder rm ~/Documents/Cache/    # Remove entire directory from staging
-
-# Index only staged files (replaces old indexing commands)
+# 3. Index staged files
 better-finder index
 
-# Alternative indexing options
-better-finder index --full            # Full reindex (ignores staging)
-better-finder index ~/Documents       # Index specific directory (ignores staging)
+# 4. Search your files
+better-finder search "quarterly financial reports"
 ```
 
-#### .betterfinderignore Support
+## 📋 Commands
 
-Create a `.betterfinderignore` file in your working directory to exclude files and patterns:
+### File Staging
+- `better-finder add <path>` - Stage files or Documents for indexing
+- `better-finder rm <path>` - Remove files from staging  
+- `better-finder status` - Show staged files
+- `better-finder index` - Index staged files
+
+### Search & Management
+- `better-finder search <query>` - Search indexed files
+- `better-finder stats` - Show index statistics
+- `better-finder clear-index` - Clear all indexed data
+- `better-finder server` - Start MCP server for Claude
+
+### Utilities
+- `better-finder show <file>` - Display file content
+- `better-finder remove-file <file>` - Remove file from index
+
+## 🎯 Key Features
+
+### **Hybrid Search**
+Combines semantic search, keyword matching, and fuzzy filename search for comprehensive results.
+
+### **Git-like Workflow**
+Familiar staging process gives you precise control over what gets indexed.
+
+### **.betterfinderignore Support**
+Use ignore patterns to exclude sensitive files:
 
 ```
-# Development directories
-.nox/
-__pycache__/
-*.pyc
-dist/
-build/
-
-# IDE and OS files
-.vscode/
-.DS_Store
-
-# Logs and secrets
-*.log
-secrets.txt
+# .betterfinderignore
+secrets/
 *.key
+temp-*.pdf
+node_modules/
 ```
 
-```bash
-# Legacy full indexing of configured paths (bypasses staging)
-better-finder index --full
+### **Supported File Types**
+- **Documents**: PDF, DOC, DOCX, TXT, MD, RTF, ODT
+- **Spreadsheets**: XLSX, XLS, CSV, ODS  
+- **Presentations**: PPTX, PPT
+- **Data**: JSON, XML
 
-# Legacy directory indexing (bypasses staging)  
-better-finder index /path/to/directory
-
-# Legacy incremental indexing (bypasses staging)
-better-finder index --incremental
-```
-
-#### Search Files
-```bash
-# Semantic search
-better-finder search "financial reports quarterly"
-
-# Search with file type filter
-better-finder search "budget" --type excel
-
-# Limit results
-better-finder search "meeting notes" --max 5
-```
-
-#### Configuration
-```bash
-# List configured scan paths
-better-finder config list
-
-# Add a new scan path
-better-finder config add ~/Documents/Projects
-
-# Remove a scan path
-better-finder config remove ~/Downloads
-```
-
-#### View Statistics
-```bash
-# Show indexing statistics
-better-finder stats
-```
-
-#### View File Content
-```bash
-# Display file content
-better-finder show /path/to/file.pdf
-
-# Clear entire index
-better-finder clear-index
-
-# Remove specific file from index
-better-finder remove-file /path/to/unwanted/file.pdf
-```
-
-### MCP Server
-
-Start the MCP server for integration with MCP clients:
+### **Claude MCP Integration**
+Start the MCP server to use Better Finder directly within Claude Desktop:
 
 ```bash
 better-finder server
 ```
 
-The server provides the following tools:
-- `search_files`: Intelligent file search
-- `index_files`: File indexing operations
-- `get_file_content`: Retrieve file content
-- `get_stats`: View indexing statistics
-- `configure_paths`: Manage scan paths
+Add to your Claude Desktop config (`~/.cursor/mcp.json`):
+```json
+{
+  "mcpServers": {
+    "better-finder": {
+      "command": "better-finder",
+      "args": ["server"]
+    }
+  }
+}
+```
 
-## Configuration
+## 🔧 Configuration
 
-The application uses sensible defaults but can be customized:
+Better Finder uses smart defaults:
 
-### Default Scan Paths
-- `~/Documents`
-- `~/Desktop`
-- `~/Downloads`
+- **Default scan paths**: `~/Documents`, `~/Desktop`, `~/Downloads`
+- **Ignored directories**: `.git`, `node_modules`, `.venv`, cache folders
+- **Chunk size**: 2000 characters for better context
+- **Search threshold**: 0.4 for comprehensive results
 
-### Supported File Types
-- **Documents**: PDF, DOC, DOCX, TXT, MD, RTF, ODT
-- **Spreadsheets**: XLSX, XLS, CSV, ODS
-- **Presentations**: PPTX, PPT, ODP, Keynote
-- **Data**: JSON, XML
+## 💡 Examples
 
-### File Size Limits
-- Maximum file size: 100 MB
-- Files larger than this limit are ignored during indexing
-
-## Architecture
-
-### Components
-
-1. **File Processors**: Extract content from different file types
-2. **Document Indexer**: Handle FAISS vector indexing and SQLite metadata storage
-3. **Search Agent**: LangGraph-powered intelligent search orchestration
-4. **MCP Server**: Model Context Protocol server implementation
-5. **CLI Interface**: Rich-powered command-line interface
-
-### Storage
-
-- **Vector Store**: FAISS index stored in `~/.enhanced_finder/vectors/`
-- **Metadata**: SQLite database in `~/.enhanced_finder/metadata.db`
-- **Configuration**: Stored in application config directory
-
-## Development
-
-### Running Tests
+### Document Discovery
 ```bash
-pytest
+# Find presentations about sales
+better-finder search "sales presentation Q4"
+
+# Look for specific file types
+better-finder search "budget" --type excel
+
+# Get more results
+better-finder search "meeting notes" --max 20
 ```
 
-### Code Formatting
+### Staging Workflow
 ```bash
-black enhanced_finder/
-ruff enhanced_finder/
+# Stage entire project documentation
+better-finder add ./docs
+
+# Remove sensitive files
+better-finder rm ./docs/secrets/
+
+# Check what will be indexed
+better-finder status
+
+# Index everything staged
+better-finder index
 ```
 
-### Project Structure
-```
-enhanced_finder/
-├── __init__.py          # Package initialization
-├── config.py            # Configuration management
-├── file_processors.py   # File content extraction
-├── indexer.py          # Vector indexing and search
-├── agents.py           # LangGraph agent orchestration
-├── mcp_server.py       # MCP server implementation
-├── cli.py              # Command-line interface
-└── main.py             # Entry point
-```
+### MCP Integration
+Once the server is running, ask Claude:
+- "Search my documents for budget reports"
+- "Find presentations about project timelines"  
+- "Show me files related to client proposals"
 
-## Performance
+## 🏗️ Architecture
 
-- **Indexing Speed**: ~100-500 files per minute (depending on file size and type)
-- **Search Speed**: Sub-second search results for most queries
-- **Memory Usage**: ~200-500 MB for typical document collections
-- **Storage**: ~1-5 MB per 1000 documents (varies by content)
+- **File Processors**: Extract content from different formats
+- **FAISS Vector Store**: Fast similarity search with sentence transformers
+- **SQLite Metadata**: Efficient file metadata and chunk storage
+- **Staging System**: Git-like file management with JSON persistence
+- **MCP Server**: Model Context Protocol integration for Claude
 
-## Troubleshooting
+## 📊 Performance
 
-### Common Issues
+- **Indexing**: ~100-500 files per minute
+- **Search**: Sub-second results
+- **Memory**: ~200-500 MB for typical collections
+- **Storage**: ~1-5 MB per 1000 documents
 
-1. **No search results**: Run `better-finder index --full` to rebuild the index
-2. **Out of memory**: Reduce `max_file_size_mb` in configuration
-3. **Slow indexing**: Check that paths don't include system directories
 
-### Debug Information
-
-```bash
-# View current statistics
-better-finder stats
-
-# Check configuration
-better-finder config list
-```
-
-## License
+## 📝 License
 
 MIT License - see LICENSE file for details.
 
-## Contributing
+---
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
-
-## Future Enhancements
-
-- [ ] Real-time file monitoring with automatic reindexing
-- [ ] Web interface for remote access
-- [ ] Integration with cloud storage (Google Drive, Dropbox)
-- [ ] Advanced query language support
-- [ ] Machine learning-based relevance ranking
-- [ ] OCR support for image-based documents
-- [ ] Duplicate file detection
-- [ ] File preview generation
+**Made for developers who want intelligent file discovery with familiar Git-like controls.**
