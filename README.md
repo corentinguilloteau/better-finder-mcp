@@ -4,6 +4,8 @@ A better version of macOS Finder that provides intelligent file search and index
 
 ## Features
 
+- **Git-like Staging Workflow**: Stage files with `add`, check status, remove from staging with `rm`, and index only what you want
+- **.betterfinderignore Support**: Use ignore patterns similar to .gitignore to exclude files and directories
 - **Hybrid Search**: Combines semantic search, keyword matching, and fuzzy filename search for comprehensive results
 - **Multiple File Types**: Support for PDF, Excel, Word, PowerPoint, CSV, text files, and more
 - **MCP Server**: Full Model Context Protocol server implementation  
@@ -34,15 +36,61 @@ pip install -e .
 
 ### Command Line Interface
 
-#### Initialize and Index Files
+#### Git-like Staging Workflow
+
+Better Finder now supports a Git-like staging workflow for precise control over which files get indexed:
+
 ```bash
-# Perform full indexing of configured paths
+# Stage files for indexing (like git add)
+better-finder add .                    # Stage all files in current directory
+better-finder add ~/Documents/Reports  # Stage specific directory
+better-finder add file1.pdf file2.docx # Stage specific files
+
+# Check what's staged for indexing (like git status)
+better-finder status
+
+# Remove files from staging (like git rm --cached)
+better-finder rm ~/Documents/Reports/old-file.pdf
+better-finder rm ~/Documents/Cache/    # Remove entire directory from staging
+
+# Index only staged files (replaces old indexing commands)
+better-finder index
+
+# Alternative indexing options
+better-finder index --full            # Full reindex (ignores staging)
+better-finder index ~/Documents       # Index specific directory (ignores staging)
+```
+
+#### .betterfinderignore Support
+
+Create a `.betterfinderignore` file in your working directory to exclude files and patterns:
+
+```
+# Development directories
+.nox/
+__pycache__/
+*.pyc
+dist/
+build/
+
+# IDE and OS files
+.vscode/
+.DS_Store
+
+# Logs and secrets
+*.log
+secrets.txt
+*.key
+```
+
+```bash
+# Legacy full indexing of configured paths (bypasses staging)
 better-finder index --full
 
-# Index a specific directory
+# Legacy directory indexing (bypasses staging)  
 better-finder index /path/to/directory
 
-# Incremental indexing (only new/modified files)
+# Legacy incremental indexing (bypasses staging)
 better-finder index --incremental
 ```
 
