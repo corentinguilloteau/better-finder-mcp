@@ -1,0 +1,29 @@
+# Environnements virtuels
+.venv/
+
+# Fichiers de packaging Python
+dist/
+build/
+*.egg-info/
+better_finder_mcp.egg-info/
+
+# Fichiers de cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Fichiers temporaires et logs
+*.log
+*.tmp
+*.swp
+
+# Fichiers de configuration d'éditeur
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Autres fichiers à ignorer
+.DS_Store
+Thumbs.db
