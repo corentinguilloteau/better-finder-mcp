@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 import PyPDF2
 from openpyxl import load_workbook
 from docx import Document
+from pptx import Presentation
 
 
 class FileProcessor(ABC):
@@ -130,11 +131,40 @@ class CSVProcessor(FileProcessor):
             return {"content": "", "error": str(e)}
 
 
+class PowerPointProcessor(FileProcessor):
+    """Processor for PowerPoint files."""
+    
+    def can_process(self, file_path: Path) -> bool:
+        return file_path.suffix.lower() in [".pptx", ".ppt"]
+    
+    def extract_content(self, file_path: Path) -> Dict[str, Any]:
+        try:
+            if file_path.suffix.lower() == ".pptx":
+                prs = Presentation(file_path)
+                text_content = []
+                
+                for slide_num, slide in enumerate(prs.slides, 1):
+                    slide_text = f"Slide {slide_num}:\n"
+                    for shape in slide.shapes:
+                        if hasattr(shape, "text") and shape.text:
+                            slide_text += shape.text + "\n"
+                    text_content.append(slide_text)
+                
+                return {
+                    "content": "\n\n".join(text_content),
+                    "slide_count": len(prs.slides)
+                }
+            else:
+                return {"content": "", "error": "PPT format not supported, only PPTX"}
+        except Exception as e:
+            return {"content": "", "error": str(e)}
+
+
 class TextProcessor(FileProcessor):
     """Processor for text files."""
     
     def can_process(self, file_path: Path) -> bool:
-        return file_path.suffix.lower() in [".txt", ".md", ".py", ".js", ".ts", ".html", ".css", ".yaml", ".yml", ".json", ".xml", ".toml", ".ini"]
+        return file_path.suffix.lower() in [".txt", ".md", ".json", ".xml", ".rtf"]
     
     def extract_content(self, file_path: Path) -> Dict[str, Any]:
         try:
@@ -170,6 +200,7 @@ class FileProcessorManager:
             PDFProcessor(),
             ExcelProcessor(),
             WordProcessor(),
+            PowerPointProcessor(),
             CSVProcessor(),
             TextProcessor()
         ]

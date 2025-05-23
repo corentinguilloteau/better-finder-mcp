@@ -1,8 +1,10 @@
 """Simplified agent implementation without complex LangGraph dependencies."""
 
 import asyncio
+import re
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+from difflib import SequenceMatcher
 
 from .indexer import DocumentIndexer
 from .config import FinderConfig
@@ -36,8 +38,23 @@ class SimpleSearchAgent:
         
         return refined
     
+    def _fuzzy_score(self, text1: str, text2: str) -> float:
+        """Calculate fuzzy similarity score between two strings."""
+        return SequenceMatcher(None, text1.lower(), text2.lower()).ratio()
+    
+    def _keyword_match_score(self, query: str, content: str) -> float:
+        """Calculate keyword matching score."""
+        query_words = set(re.findall(r'\w+', query.lower()))
+        content_words = set(re.findall(r'\w+', content.lower()))
+        
+        if not query_words:
+            return 0.0
+        
+        matches = len(query_words.intersection(content_words))
+        return matches / len(query_words)
+    
     def _filename_search(self, pattern: str, max_results: int = 20) -> List[Dict[str, Any]]:
-        """Search files by filename pattern."""
+        """Search files by filename pattern with fuzzy matching."""
         results = []
         pattern_lower = pattern.lower()
         
@@ -46,11 +63,29 @@ class SimpleSearchAgent:
                 continue
                 
             for file_path in scan_path.rglob("*"):
-                if file_path.is_file() and pattern_lower in file_path.name.lower():
+                if not file_path.is_file():
+                    continue
+                
+                filename_lower = file_path.name.lower()
+                
+                # Exact substring match
+                if pattern_lower in filename_lower:
+                    score = 1.0
+                else:
+                    # Fuzzy match
+                    score = self._fuzzy_score(pattern_lower, filename_lower)
+                    if score < 0.6:  # Skip low similarity matches
+                        continue
+                
+                # Keyword match in filename
+                keyword_score = self._keyword_match_score(pattern, file_path.name)
+                final_score = max(score, keyword_score)
+                
+                if final_score >= 0.6:
                     results.append({
                         "file_path": str(file_path),
                         "file_name": file_path.name,
-                        "similarity_score": 1.0,
+                        "similarity_score": final_score,
                         "search_type": "filename",
                         "metadata": {"file_size": file_path.stat().st_size}
                     })
@@ -58,7 +93,7 @@ class SimpleSearchAgent:
                     if len(results) >= max_results:
                         break
         
-        return results
+        return sorted(results, key=lambda x: x["similarity_score"], reverse=True)
     
     def _determine_search_strategy(self, query: str) -> str:
         """Determine the best search strategy for the query."""
@@ -74,51 +109,74 @@ class SimpleSearchAgent:
         
         return "semantic"
     
+    def _hybrid_score_combine(self, semantic_score: float, keyword_score: float, filename_score: float = 0.0) -> float:
+        """Combine different search scores using weighted average."""
+        # Weights for different search types
+        semantic_weight = 0.5
+        keyword_weight = 0.3  
+        filename_weight = 0.2
+        
+        return (semantic_score * semantic_weight + 
+                keyword_score * keyword_weight + 
+                filename_score * filename_weight)
+    
     async def search(self, query: str, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-        """Execute the search workflow."""
-        results = []
+        """Execute hybrid search workflow combining semantic, keyword, and filename matching."""
+        all_results = {}  # Use dict to track best score per file
         strategy = self._determine_search_strategy(query)
         
         # Semantic search
         if strategy in ["semantic", "both"]:
             refined_query = self._refine_query(query)
-            semantic_results = await self.indexer.search(refined_query, self.config.max_search_results)
+            semantic_results = await self.indexer.search(refined_query, self.config.max_search_results * 2)
             
             for result in semantic_results:
-                result["search_type"] = "semantic"
-            
-            results.extend(semantic_results)
+                path = result.get("file_path", "")
+                semantic_score = result.get("similarity_score", 0)
+                
+                # Add keyword matching score for semantic results
+                content = result.get("content_snippet", "")
+                keyword_score = self._keyword_match_score(query, content)
+                
+                # Combine scores
+                hybrid_score = self._hybrid_score_combine(semantic_score, keyword_score)
+                
+                if path not in all_results or all_results[path]["similarity_score"] < hybrid_score:
+                    result["similarity_score"] = hybrid_score
+                    result["search_type"] = "hybrid_semantic"
+                    all_results[path] = result
         
-        # Filename search
+        # Filename search with fuzzy matching
         if strategy in ["filename", "both"]:
-            filename_results = self._filename_search(query, 10)
-            results.extend(filename_results)
-        
-        # Deduplicate results
-        seen_paths = set()
-        unique_results = []
-        
-        for result in results:
-            path = result.get("file_path", "")
-            if path not in seen_paths:
-                seen_paths.add(path)
-                unique_results.append(result)
-        
-        # Sort by similarity score and search type priority
-        def sort_key(result):
-            score = result.get("similarity_score", 0)
-            search_type = result.get("search_type", "")
+            filename_results = self._filename_search(query, 15)
             
-            # Boost filename matches
-            if search_type == "filename":
-                score += 0.2
-            
-            return score
+            for result in filename_results:
+                path = result.get("file_path", "")
+                filename_score = result.get("similarity_score", 0)
+                
+                if path in all_results:
+                    # Boost existing result with filename match
+                    existing = all_results[path]
+                    existing_score = existing.get("similarity_score", 0)
+                    boosted_score = max(existing_score + 0.2, filename_score)
+                    existing["similarity_score"] = boosted_score
+                    existing["search_type"] = "hybrid_combined"
+                else:
+                    # New filename-only result
+                    result["search_type"] = "filename_fuzzy"
+                    all_results[path] = result
         
-        unique_results.sort(key=sort_key, reverse=True)
+        # Convert to list and sort by score
+        final_results = list(all_results.values())
+        final_results.sort(key=lambda x: x.get("similarity_score", 0), reverse=True)
         
-        # Limit results
-        return unique_results[:self.config.max_search_results]
+        # Apply similarity threshold and limit results
+        filtered_results = [
+            r for r in final_results 
+            if r.get("similarity_score", 0) >= 0.3  # Lower threshold for better recall
+        ]
+        
+        return filtered_results[:self.config.max_search_results]
 
 
 class SimpleIndexingAgent:

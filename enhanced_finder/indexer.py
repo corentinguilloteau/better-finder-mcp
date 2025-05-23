@@ -269,6 +269,38 @@ class DocumentIndexer:
         
         return results
     
+    def remove_file_from_index(self, file_path: Path) -> bool:
+        """Remove a specific file from the index."""
+        file_path_str = str(file_path.resolve())
+        
+        # Check if file exists in database
+        cursor = self.conn.execute("SELECT id FROM documents WHERE file_path = ?", (file_path_str,))
+        result = cursor.fetchone()
+        
+        if not result:
+            return False
+        
+        doc_id = result[0]
+        
+        # Get all embedding indices for this document's chunks
+        cursor = self.conn.execute("SELECT embedding_index FROM chunks WHERE document_id = ?", (doc_id,))
+        embedding_indices = [row[0] for row in cursor.fetchall()]
+        
+        # Remove chunks from database
+        self.conn.execute("DELETE FROM chunks WHERE document_id = ?", (doc_id,))
+        
+        # Remove document from database
+        self.conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+        self.conn.commit()
+        
+        # Note: FAISS doesn't support efficient removal of individual vectors
+        # For proper cleanup, we'd need to rebuild the index without removed vectors
+        # For now, we'll just mark them as removed in metadata
+        print(f"Removed file from database: {file_path_str}")
+        print("Note: Vector index still contains old embeddings. Consider running full reindex for cleanup.")
+        
+        return True
+    
     def get_stats(self) -> Dict[str, Any]:
         """Get indexing statistics."""
         cursor = self.conn.execute("SELECT COUNT(*) FROM documents")

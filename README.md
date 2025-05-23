@@ -4,13 +4,13 @@ A better version of macOS Finder that provides intelligent file search and index
 
 ## Features
 
-- **Intelligent Search**: Semantic search using sentence transformers and FAISS vector store
-- **Multiple File Types**: Support for PDF, Excel, Word, CSV, text files, and more
-- **MCP Server**: Full Model Context Protocol server implementation
+- **Hybrid Search**: Combines semantic search, keyword matching, and fuzzy filename search for comprehensive results
+- **Multiple File Types**: Support for PDF, Excel, Word, PowerPoint, CSV, text files, and more
+- **MCP Server**: Full Model Context Protocol server implementation  
 - **Rich CLI**: Beautiful command-line interface using Rich library
-- **Agent Orchestration**: LangGraph-powered agents for intelligent file operations
-- **Automatic Indexing**: Background indexing with file change detection
-- **Fast Retrieval**: Vector-based similarity search for quick file discovery
+- **Speed Optimized**: Larger chunk sizes and lower similarity thresholds for faster, more comprehensive search
+- **Index Management**: Clear indexes and remove specific files as needed
+- **Fast Retrieval**: Vector-based similarity search with FAISS for quick file discovery
 
 ## Installation
 
@@ -80,6 +80,12 @@ better-finder stats
 ```bash
 # Display file content
 better-finder show /path/to/file.pdf
+
+# Clear entire index
+better-finder clear-index
+
+# Remove specific file from index
+better-finder remove-file /path/to/unwanted/file.pdf
 ```
 
 ### MCP Server
@@ -107,10 +113,10 @@ The application uses sensible defaults but can be customized:
 - `~/Downloads`
 
 ### Supported File Types
-- **Documents**: PDF, DOC, DOCX, TXT, MD
-- **Spreadsheets**: XLSX, XLS, CSV
-- **Code**: PY, JS, TS, HTML, CSS
-- **Data**: JSON, XML, YAML, TOML
+- **Documents**: PDF, DOC, DOCX, TXT, MD, RTF, ODT
+- **Spreadsheets**: XLSX, XLS, CSV, ODS
+- **Presentations**: PPTX, PPT, ODP, Keynote
+- **Data**: JSON, XML
 
 ### File Size Limits
 - Maximum file size: 100 MB

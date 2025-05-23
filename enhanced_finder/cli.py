@@ -296,6 +296,81 @@ def show(file_path: str = typer.Argument(..., help="Path to file to display")):
 
 
 @app.command()
+def clear_index(
+    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt")
+):
+    """Clear the entire index and metadata database."""
+    config = FinderConfig()
+    
+    if not confirm:
+        console.print("[yellow]This will delete all indexed data and cannot be undone.[/yellow]")
+        if not Confirm.ask("Are you sure you want to clear the index?"):
+            console.print("[blue]Operation cancelled.[/blue]")
+            return
+    
+    try:
+        # Remove vector store files
+        if config.vector_store_path.exists():
+            import shutil
+            shutil.rmtree(config.vector_store_path)
+            console.print(f"[green]✓[/green] Removed vector store: {config.vector_store_path}")
+        
+        # Remove metadata database
+        if config.metadata_db_path.exists():
+            config.metadata_db_path.unlink()
+            console.print(f"[green]✓[/green] Removed metadata database: {config.metadata_db_path}")
+        
+        # Remove index directory if empty
+        if config.index_path.exists() and not any(config.index_path.iterdir()):
+            config.index_path.rmdir()
+            console.print(f"[green]✓[/green] Removed empty index directory: {config.index_path}")
+        
+        console.print(Panel(
+            "[green]Index cleared successfully![/green]\n\nRun 'better-finder index --full' to rebuild the index.",
+            title="Clear Complete",
+            border_style="green"
+        ))
+    
+    except Exception as e:
+        console.print(f"[red]Error clearing index: {e}[/red]")
+
+
+@app.command()
+def remove_file(
+    file_path: str = typer.Argument(..., help="Path to file to remove from index"),
+    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt")
+):
+    """Remove a specific file from the index."""
+    config = FinderConfig()
+    path_obj = Path(file_path).resolve()
+    
+    if not confirm:
+        if not Confirm.ask(f"Remove '{path_obj}' from index?"):
+            console.print("[blue]Operation cancelled.[/blue]")
+            return
+    
+    try:
+        indexer = DocumentIndexer(config)
+        indexer.load_or_create_index()
+        
+        # Check if file is in index
+        if not indexer.is_file_indexed(path_obj):
+            console.print(f"[yellow]File not found in index: {path_obj}[/yellow]")
+            return
+        
+        # Remove from index (this would need to be implemented in indexer)
+        removed = indexer.remove_file_from_index(path_obj)
+        
+        if removed:
+            console.print(f"[green]✓[/green] Removed file from index: {path_obj}")
+        else:
+            console.print(f"[yellow]File was not found in index: {path_obj}[/yellow]")
+            
+    except Exception as e:
+        console.print(f"[red]Error removing file from index: {e}[/red]")
+
+
+@app.command()
 def server():
     """Start the MCP server."""
     from .mcp_server import EnhancedFinderMCPServer

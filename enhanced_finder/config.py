@@ -16,9 +16,9 @@ class FinderConfig(BaseModel):
     # File types to index
     supported_extensions: Set[str] = {
         ".pdf", ".txt", ".md", ".doc", ".docx", 
-        ".xlsx", ".xls", ".csv", ".json", ".xml",
-        ".py", ".js", ".ts", ".html", ".css",
-        ".yaml", ".yml", ".toml", ".ini"
+        ".xlsx", ".xls", ".csv", 
+        ".pptx", ".ppt", 
+        ".rtf", ".odt", ".ods"
     }
     
     # Directories to ignore
@@ -33,13 +33,13 @@ class FinderConfig(BaseModel):
     max_file_size_mb: int = 100
     
     # Indexing settings
-    chunk_size: int = 1000
-    chunk_overlap: int = 200
+    chunk_size: int = 2000
+    chunk_overlap: int = 400
     embedding_model: str = "all-MiniLM-L6-v2"
     
-    # Search settings
+    # Search settings  
     max_search_results: int = 20
-    similarity_threshold: float = 0.7
+    similarity_threshold: float = 0.4
     
     # Paths to scan
     scan_paths: List[Path] = [
